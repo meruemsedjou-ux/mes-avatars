@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mes avatars</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f3ee;--fg:#1d1a33;--card:#fff;--mut:#6b6880;--ac:#ff9f1c;--line:#ddd8cf;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#16142a;--fg:#f1eefc;--card:#221f3d;--mut:#a39fc0;--line:#38345c}}
+:root[data-theme="dark"]{--bg:#16142a;--fg:#f1eefc;--card:#221f3d;--mut:#a39fc0;--line:#38345c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:'Bricolage Grotesque',system-ui,sans-serif;line-height:1.4}
+main{max-width:640px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:2rem;margin:0 0 4px}
+p.sub{color:var(--mut);margin:0 0 14px}
+button,label.btn{font:inherit;cursor:pointer;border:2px solid var(--fg);background:var(--card);color:var(--fg);padding:9px 12px;border-radius:12px;font-weight:700}
+button:focus-visible,label.btn:focus-within{outline:3px solid var(--ac);outline-offset:2px}
+label.btn{position:relative;overflow:hidden;display:inline-block}
+input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
+.primary{background:var(--ac);color:#1d1a33}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+#stage{border:1px solid var(--line);border-radius:20px;padding:26px;display:flex;justify-content:center;overflow:hidden}
+#av{width:min(260px,70vw);aspect-ratio:1;border:8px solid #ff9f1c;overflow:hidden;background:#ffffff99}
+#av svg,#grid svg{width:100%;height:100%;display:block}
+#av img,#grid img{width:100%;height:100%;object-fit:cover;display:block}
+.circle{border-radius:50%}.round{border-radius:28px}.square{border-radius:0}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:10px;margin-top:14px}
+#grid button{padding:0;border-width:3px;border-radius:14px;overflow:hidden;aspect-ratio:1}
+#grid button[aria-pressed="true"]{border-color:var(--ac)}
+input[type=color]{width:44px;height:44px;border:2px solid var(--fg);border-radius:12px;padding:2px;background:var(--card)}
+.danger{border-color:#c0392b;color:#c0392b}
+.hide{display:none}
+#msg{color:var(--mut);min-height:1.4em}
+small{color:var(--mut)}
+</style>
+</head>
+<body>
+<main>
+<h1>Mes avatars</h1>
+<p class="sub">Crée des avatars, ajoute tes photos, change d'apparence et anime-les avec ta voix et ta caméra.</p>
+<div id="stage"><div id="av" class="circle"></div></div>
+<p id="msg" aria-live="polite"></p>
+<div class="row">
+<button id="new" class="primary">Nouvel avatar au hasard</button>
+<label class="btn">Ajouter mes photos<input id="file" type="file" accept="image/*" multiple></label>
+<button id="rand">Mélanger</button>
+</div>
+<div class="row gen"><button data-p="hs" data-n="4">Coiffure</button><button data-p="es" data-n="3">Yeux</button><button data-p="ac" data-n="3">Accessoire</button><button id="cols">Couleurs</button></div>
+<div class="row"><button data-s="circle">Rond</button><button data-s="round">Arrondi</button><button data-s="square">Carré</button>
+<small>Cadre</small><input id="col" type="color" aria-label="Couleur du cadre"><small>Fond</small><input id="bgc" type="color" aria-label="Couleur du fond"></div>
+<div class="row"><button id="live">Animer avec caméra et micro</button><button id="dl">Télécharger l'image</button><button id="del" class="danger">Supprimer</button></div>
+<div id="grid"></div>
+</main>
+<script>
+const $=s=>document.querySelector(s),P=a=>a[Math.floor(Math.random()*a.length)],R=n=>Math.floor(Math.random()*n);
+const SK=['#f5d0b0','#e0a878','#c68642','#8d5524','#5c3a1e'],HC=['#1b1b1b','#4a2c17','#a0522d','#e6b422','#d2457a','#3d6ee0'],OC=['#ff9f1c','#2ec4b6','#e63946','#6a4cff','#2b9348','#111827'],BG=['#ffe9c7','#d6f1ee','#fbd5d9','#ddd6ff','#d3f0dc','#e5e7eb'];
+const rnd=()=>({sk:P(SK),hc:P(HC),oc:P(OC),hs:R(4),es:R(3),ac:R(3)});
+const gen=()=>({kind:'gen',a:rnd(),shape:'circle',color:P(OC),bg:P(BG)});
+function svg(a,m){
+  m=m||0;const h=a.hc;
+  const back=a.hs==1?`<path d="M50 90c-5-55 25-70 50-70s55 15 50 70v60h-22v-70c-15-5-45-5-56 0v70H50z" fill="${h}"/>`:a.hs==2?`<circle cx="100" cy="70" r="58" fill="${h}"/>`:'';
+  const front=a.hs==0?`<path d="M52 85c0-45 25-60 48-60s48 15 48 60c-10-20-30-28-48-28s-38 8-48 28z" fill="${h}"/>`:a.hs==1?`<path d="M55 80c10-30 30-40 45-40s35 10 45 40c-20-12-70-12-90 0z" fill="${h}"/>`:'';
+  const eyes=[`<circle cx="80" cy="92" r="5" fill="#222"/><circle cx="120" cy="92" r="5" fill="#222"/>`,`<path d="M72 94q8-10 16 0M112 94q8-10 16 0" stroke="#222" stroke-width="4" fill="none" stroke-linecap="round"/>`,`<circle cx="80" cy="92" r="9" fill="#fff"/><circle cx="120" cy="92" r="9" fill="#fff"/><circle cx="82" cy="93" r="5" fill="#222"/><circle cx="122" cy="93" r="5" fill="#222"/>`][a.es];
+  const mouth=m>.1?`<ellipse cx="100" cy="124" rx="13" ry="${3+m*12}" fill="#7a2b2b"/>`:`<path d="M86 120q14 12 28 0" stroke="#7a2b2b" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+  const acc=[``,`<g fill="none" stroke="#222" stroke-width="3"><circle cx="80" cy="92" r="14"/><circle cx="120" cy="92" r="14"/><path d="M94 92h12"/></g>`,`<rect x="48" y="58" width="104" height="9" rx="4" fill="#d1453b"/><path d="M62 60c0-38 18-46 38-46s38 8 38 46z" fill="#d1453b"/>`][a.ac];
+  return `<svg viewBox="0 0 200 200" width="200" height="200" xmlns="http://www.w3.org/2000/svg">${back}<path d="M40 200c0-40 30-55 60-55s60 15 60 55z" fill="${a.oc}"/><rect x="88" y="120" width="24" height="32" fill="${a.sk}"/><ellipse cx="100" cy="90" rx="45" ry="52" fill="${a.sk}"/>${front}${eyes}${mouth}${acc}</svg>`;
+}
+let db=null,items=[],sel=null;
+function open(){return new Promise(ok=>{try{const r=indexedDB.open('avatars2',1);r.onupgradeneeded=()=>r.result.createObjectStore('p',{keyPath:'id',autoIncrement:true});r.onsuccess=()=>{db=r.result;ok()};r.onerror=()=>ok()}catch(e){ok()}})}
+const st=m=>db.transaction('p',m).objectStore('p');
+function all(){return new Promise(ok=>{if(!db)return ok(items);try{const q=st('readonly').getAll();q.onsuccess=()=>ok(q.result);q.onerror=()=>ok(items)}catch(e){ok(items)}})}
+function save(o){return new Promise(ok=>{if(!db){if(!o.id)o.id=Date.now()+Math.random();items=items.filter(i=>i.id!==o.id).concat(o);return ok(o.id)}try{const q=st('readwrite').put(o);q.onsuccess=()=>{o.id=q.result;ok(q.result)};q.onerror=()=>ok()}catch(e){ok()}})}
+function rem(id){return new Promise(ok=>{if(!db){items=items.filter(i=>i.id!==id);return ok()}try{const q=st('readwrite').delete(id);q.onsuccess=()=>ok();q.onerror=()=>ok()}catch(e){ok()}})}
+const cur=()=>items.find(i=>i.id===sel);
+const msg=t=>$('#msg').textContent=t||'';
+const draw=(c,m)=>c.kind==='gen'?svg(c.a,m):`<img alt="" src="${c.src}">`;
+async function refresh(){
+  items=await all();
+  if(!cur())sel=items.length?items[items.length-1].id:null;
+  const g=$('#grid');g.innerHTML='';
+  items.forEach(i=>{const b=document.createElement('button');b.setAttribute('aria-pressed',i.id===sel);b.setAttribute('aria-label','Choisir cet avatar');b.style.background=i.bg;b.innerHTML=draw(i);b.onclick=()=>{sel=i.id;refresh()};g.appendChild(b)});
+  const c=cur();if(!c)return;
+  const av=$('#av');av.className=c.shape;av.style.borderColor=c.color;av.innerHTML=draw(c);
+  $('#stage').style.background=c.bg;$('#col').value=c.color;$('#bgc').value=c.bg;
+  document.querySelectorAll('.gen').forEach(e=>e.classList.toggle('hide',c.kind!=='gen'));
+}
+const edit=async f=>{const c=cur();if(c){f(c);await save(c);refresh()}};
+$('#new').onclick=async()=>{const o=gen();sel=await save(o)||o.id;refresh()};
+$('#rand').onclick=()=>{if(items.length){sel=P(items).id;refresh()}};
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>edit(c=>{c.a[b.dataset.p]=(c.a[b.dataset.p]+1)%+b.dataset.n}));
+$('#cols').onclick=()=>edit(c=>{c.a.sk=P(SK);c.a.hc=P(HC);c.a.oc=P(OC)});
+document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>edit(c=>c.shape=b.dataset.s));
+$('#col').onchange=e=>edit(c=>c.color=e.target.value);
+$('#bgc').onchange=e=>edit(c=>c.bg=e.target.value);
+$('#del').onclick=async()=>{const c=cur();if(c){await rem(c.id);sel=null;refresh()}};
+async function shrink(f){try{const b=await createImageBitmap(f);const k=Math.min(1,700/Math.max(b.width,b.height));const c=document.createElement('canvas');c.width=Math.round(b.width*k);c.height=Math.round(b.height*k);c.getContext('2d').drawImage(b,0,0,c.width,c.height);return c.toDataURL('image/jpeg',0.85)}catch(e){return new Promise(ok=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>ok(null);r.readAsDataURL(f)})}}
+$('#file').onchange=async e=>{
+  const fs=[...e.target.files];e.target.value='';
+  for(const f of fs){const src=await shrink(f);if(!src)continue;const o={kind:'photo',src,shape:'circle',color:P(OC),bg:P(BG)};sel=await save(o)||o.id}
+  refresh();
+};
+$('#dl').onclick=async()=>{
+  const c=cur();if(!c)return;
+  try{
+    const img=new Image();img.src=c.kind==='gen'?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg(c.a,0)):c.src;await img.decode();
+    const S=640,z=480,o=(S-z)/2,k=document.createElement('canvas');k.width=k.height=S;const g=k.getContext('2d');
+    const path=()=>{g.beginPath();if(c.shape==='circle')g.arc(S/2,S/2,z/2,0,7);else if(c.shape==='round'&&g.roundRect)g.roundRect(o,o,z,z,z*.12);else g.rect(o,o,z,z)};
+    g.fillStyle=c.bg;g.fillRect(0,0,S,S);
+    g.save();path();g.clip();g.fillStyle='#ffffff99';g.fillRect(o,o,z,z);
+    const w=img.width,h=img.height,m=Math.min(w,h);g.drawImage(img,(w-m)/2,(h-m)/2,m,m,o,o,z,z);g.restore();
+    path();g.lineWidth=16;g.strokeStyle=c.color;g.stroke();
+    k.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='avatar.png';a.click();msg("Image téléchargée.")});
+  }catch(e){msg("Le téléchargement n'est pas possible ici. Ouvre le fichier dans Chrome.")}
+};
+let live=null;
+$('#live').onclick=async()=>{
+  if(live){live.stop();return}
+  try{
+    const ms=await navigator.mediaDevices.getUserMedia({video:{width:160,height:120,facingMode:'user'},audio:true});
+    const v=document.createElement('video');v.muted=true;v.playsInline=true;v.srcObject=ms;await v.play();
+    const AC=window.AudioContext||window.webkitAudioContext,ac=new AC(),an=ac.createAnalyser();an.fftSize=512;ac.createMediaStreamSource(ms).connect(an);
+    const buf=new Uint8Array(an.fftSize),cv=document.createElement('canvas');cv.width=40;cv.height=30;const cx=cv.getContext('2d',{willReadFrequently:true});
+    let prev=null,x=0,m=0,lm=-1,on=true;const av=$('#av');
+    (function loop(){
+      if(!on)return;
+      an.getByteTimeDomainData(buf);let sum=0;for(const b of buf){const d=(b-128)/128;sum+=d*d}const vol=Math.sqrt(sum/buf.length);
+      cx.drawImage(v,0,0,40,30);const d=cx.getImageData(0,0,40,30).data,g=new Uint8Array(1200);let n=0,sx=0;
+      for(let i=0;i<1200;i++){g[i]=d[i*4]*.3+d[i*4+1]*.6+d[i*4+2]*.1;if(prev&&Math.abs(g[i]-prev[i])>25){n++;sx+=i%40}}
+      prev=g;if(n>30)x+=(-(sx/n/40-.5)*2-x)*.25;else x*=.95;
+      m+=(Math.min(1,vol*5)-m)*.5;
+      av.style.transform=`translateX(${x*50}px) rotate(${x*12}deg) scale(${1+m*.12})`;
+      const c=cur();if(c&&c.kind==='gen'&&Math.abs(m-lm)>.08){lm=m;av.innerHTML=svg(c.a,m)}
+      requestAnimationFrame(loop);
+    })();
+    live={stop(){on=false;ms.getTracks().forEach(t=>t.stop());ac.close();av.style.transform='';live=null;$('#live').textContent='Animer avec caméra et micro';msg();refresh()}};
+    $('#live').textContent="Arrêter l'animation";msg("Parle et bouge : ton avatar te suit.");
+  }catch(e){msg("Caméra ou micro indisponibles ici. Ouvre le fichier dans Chrome et autorise l'accès.")}
+};
+open().then(async()=>{items=await all();if(!items.length){for(let i=0;i<4;i++)await save(gen())}refresh()});
+</script>
+</body>
+</html>
