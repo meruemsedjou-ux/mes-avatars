@@ -49,7 +49,7 @@ small{color:var(--mut)}
 <div class="row gen"><button data-p="hs" data-n="4">Coiffure</button><button data-p="es" data-n="3">Yeux</button><button data-p="ac" data-n="3">Accessoire</button><button id="cols">Couleurs</button></div>
 <div class="row"><button data-s="circle">Rond</button><button data-s="round">Arrondi</button><button data-s="square">Carré</button>
 <small>Cadre</small><input id="col" type="color" aria-label="Couleur du cadre"><small>Fond</small><input id="bgc" type="color" aria-label="Couleur du fond"></div>
-<div class="row"><button id="live">Animer avec caméra et micro</button><button id="dl">Télécharger l'image</button><button id="del" class="danger">Supprimer</button></div>
+<div class="row"><button id="live">Animer avec ma caméra</button><button id="dl">Télécharger l'image</button><button id="del" class="danger">Supprimer</button></div>
 <div id="grid"></div>
 </main>
 <script>
@@ -57,11 +57,11 @@ const $=s=>document.querySelector(s),P=a=>a[Math.floor(Math.random()*a.length)],
 const SK=['#f5d0b0','#e0a878','#c68642','#8d5524','#5c3a1e'],HC=['#1b1b1b','#4a2c17','#a0522d','#e6b422','#d2457a','#3d6ee0'],OC=['#ff9f1c','#2ec4b6','#e63946','#6a4cff','#2b9348','#111827'],BG=['#ffe9c7','#d6f1ee','#fbd5d9','#ddd6ff','#d3f0dc','#e5e7eb'];
 const rnd=()=>({sk:P(SK),hc:P(HC),oc:P(OC),hs:R(4),es:R(3),ac:R(3)});
 const gen=()=>({kind:'gen',a:rnd(),shape:'circle',color:P(OC),bg:P(BG)});
-function svg(a,m){
+function svg(a,m,b){
   m=m||0;const h=a.hc;
   const back=a.hs==1?`<path d="M50 90c-5-55 25-70 50-70s55 15 50 70v60h-22v-70c-15-5-45-5-56 0v70H50z" fill="${h}"/>`:a.hs==2?`<circle cx="100" cy="70" r="58" fill="${h}"/>`:'';
   const front=a.hs==0?`<path d="M52 85c0-45 25-60 48-60s48 15 48 60c-10-20-30-28-48-28s-38 8-48 28z" fill="${h}"/>`:a.hs==1?`<path d="M55 80c10-30 30-40 45-40s35 10 45 40c-20-12-70-12-90 0z" fill="${h}"/>`:'';
-  const eyes=[`<circle cx="80" cy="92" r="5" fill="#222"/><circle cx="120" cy="92" r="5" fill="#222"/>`,`<path d="M72 94q8-10 16 0M112 94q8-10 16 0" stroke="#222" stroke-width="4" fill="none" stroke-linecap="round"/>`,`<circle cx="80" cy="92" r="9" fill="#fff"/><circle cx="120" cy="92" r="9" fill="#fff"/><circle cx="82" cy="93" r="5" fill="#222"/><circle cx="122" cy="93" r="5" fill="#222"/>`][a.es];
+  const eyes=b&&a.es!=1?`<path d="M72 94h16M112 94h16" stroke="#222" stroke-width="4" stroke-linecap="round"/>`:[`<circle cx="80" cy="92" r="5" fill="#222"/><circle cx="120" cy="92" r="5" fill="#222"/>`,`<path d="M72 94q8-10 16 0M112 94q8-10 16 0" stroke="#222" stroke-width="4" fill="none" stroke-linecap="round"/>`,`<circle cx="80" cy="92" r="9" fill="#fff"/><circle cx="120" cy="92" r="9" fill="#fff"/><circle cx="82" cy="93" r="5" fill="#222"/><circle cx="122" cy="93" r="5" fill="#222"/>`][a.es];
   const mouth=m>.1?`<ellipse cx="100" cy="124" rx="13" ry="${3+m*12}" fill="#7a2b2b"/>`:`<path d="M86 120q14 12 28 0" stroke="#7a2b2b" stroke-width="4" fill="none" stroke-linecap="round"/>`;
   const acc=[``,`<g fill="none" stroke="#222" stroke-width="3"><circle cx="80" cy="92" r="14"/><circle cx="120" cy="92" r="14"/><path d="M94 92h12"/></g>`,`<rect x="48" y="58" width="104" height="9" rx="4" fill="#d1453b"/><path d="M62 60c0-38 18-46 38-46s38 8 38 46z" fill="#d1453b"/>`][a.ac];
   return `<svg viewBox="0 0 200 200" width="200" height="200" xmlns="http://www.w3.org/2000/svg">${back}<path d="M40 200c0-40 30-55 60-55s60 15 60 55z" fill="${a.oc}"/><rect x="88" y="120" width="24" height="32" fill="${a.sk}"/><ellipse cx="100" cy="90" rx="45" ry="52" fill="${a.sk}"/>${front}${eyes}${mouth}${acc}</svg>`;
@@ -113,29 +113,51 @@ $('#dl').onclick=async()=>{
     k.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='avatar.png';a.click();msg("Image téléchargée.")});
   }catch(e){msg("Le téléchargement n'est pas possible ici. Ouvre le fichier dans Chrome.")}
 };
-let live=null;
+let live=null,FL=null;
+async function loadFace(){
+  if(FL)return FL;
+  const V='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+  const {FaceLandmarker,FilesetResolver}=await import(V+'/+esm');
+  const fs=await FilesetResolver.forVisionTasks(V+'/wasm');
+  const mk=d=>FaceLandmarker.createFromOptions(fs,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',delegate:d},runningMode:'VIDEO',numFaces:1});
+  try{FL=await mk('GPU')}catch(e){FL=await mk('CPU')}
+  return FL;
+}
+const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
 $('#live').onclick=async()=>{
   if(live){live.stop();return}
   try{
-    const ms=await navigator.mediaDevices.getUserMedia({video:{width:160,height:120,facingMode:'user'},audio:true});
+    msg('Chargement du suivi du visage...');
+    const [fl,ms]=await Promise.all([loadFace(),navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:'user'}})]);
     const v=document.createElement('video');v.muted=true;v.playsInline=true;v.srcObject=ms;await v.play();
-    const AC=window.AudioContext||window.webkitAudioContext,ac=new AC(),an=ac.createAnalyser();an.fftSize=512;ac.createMediaStreamSource(ms).connect(an);
-    const buf=new Uint8Array(an.fftSize),cv=document.createElement('canvas');cv.width=40;cv.height=30;const cx=cv.getContext('2d',{willReadFrequently:true});
-    let prev=null,x=0,m=0,lm=-1,on=true;const av=$('#av');
+    const s={x:0,y:0,rx:0,ry:0,rz:0,sc:1,m:0};let base=null,key='',last=-1,on=true,blink=false;const av=$('#av');
     (function loop(){
       if(!on)return;
-      an.getByteTimeDomainData(buf);let sum=0;for(const b of buf){const d=(b-128)/128;sum+=d*d}const vol=Math.sqrt(sum/buf.length);
-      cx.drawImage(v,0,0,40,30);const d=cx.getImageData(0,0,40,30).data,g=new Uint8Array(1200);let n=0,sx=0;
-      for(let i=0;i<1200;i++){g[i]=d[i*4]*.3+d[i*4+1]*.6+d[i*4+2]*.1;if(prev&&Math.abs(g[i]-prev[i])>25){n++;sx+=i%40}}
-      prev=g;if(n>30)x+=(-(sx/n/40-.5)*2-x)*.25;else x*=.95;
-      m+=(Math.min(1,vol*5)-m)*.5;
-      av.style.transform=`translateX(${x*50}px) rotate(${x*12}deg) scale(${1+m*.12})`;
-      const c=cur();if(c&&c.kind==='gen'&&Math.abs(m-lm)>.08){lm=m;av.innerHTML=svg(c.a,m)}
+      if(v.currentTime!==last){
+        last=v.currentTime;
+        const r=fl.detectForVideo(v,performance.now()),p=r.faceLandmarks&&r.faceLandmarks[0];
+        if(p){
+          const L=p[33],R=p[263],N=p[1],U=p[13],D=p[14],T=p[10],C=p[152];
+          const ex=(L.x+R.x)/2,ey=(L.y+R.y)/2,ed=Math.hypot(R.x-L.x,R.y-L.y);
+          const pr=(N.y-ey)/ed;if(!base)base={pr,ed};
+          const k=.4,t={
+            x:-(N.x-.5)*2*70,y:(N.y-.5)*2*40,
+            ry:cl((N.x-ex)/ed*110,-40,40),rx:cl(-(pr-base.pr)*110,-30,30),
+            rz:-Math.atan2(R.y-L.y,R.x-L.x)*180/Math.PI,
+            sc:cl(ed/base.ed,.8,1.3),m:cl(((D.y-U.y)/(C.y-T.y)-.015)/.08,0,1)
+          };
+          for(const q in t)s[q]+=(t[q]-s[q])*k;
+          blink=Math.abs(p[159].y-p[145].y)/Math.abs(p[33].x-p[133].x)<.12;
+          av.style.transform=`translate(${s.x}px,${s.y}px) perspective(500px) rotateX(${s.rx}deg) rotateY(${s.ry}deg) rotateZ(${s.rz}deg) scale(${s.sc})`;
+          const c=cur(),nk=Math.round(s.m*10)+':'+blink;
+          if(c&&c.kind==='gen'&&nk!==key){key=nk;av.innerHTML=svg(c.a,s.m,blink)}
+        }
+      }
       requestAnimationFrame(loop);
     })();
-    live={stop(){on=false;ms.getTracks().forEach(t=>t.stop());ac.close();av.style.transform='';live=null;$('#live').textContent='Animer avec caméra et micro';msg();refresh()}};
-    $('#live').textContent="Arrêter l'animation";msg("Parle et bouge : ton avatar te suit.");
-  }catch(e){msg("Caméra ou micro indisponibles ici. Ouvre le fichier dans Chrome et autorise l'accès.")}
+    live={stop(){on=false;ms.getTracks().forEach(t=>t.stop());av.style.transform='';live=null;$('#live').textContent='Animer avec ma caméra';msg();refresh()}};
+    $('#live').textContent="Arrêter l'animation";msg("Regarde la caméra : ton avatar suit ta tête. Les avatars dessinés ouvrent aussi la bouche et clignent des yeux.");
+  }catch(e){msg("Le suivi du visage n'a pas démarré ("+(e&&e.name||'erreur')+"). Vérifie ta connexion et autorise la caméra.")}
 };
 open().then(async()=>{items=await all();if(!items.length){for(let i=0;i<4;i++)await save(gen())}refresh()});
 </script>
