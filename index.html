@@ -23,6 +23,7 @@ input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;curs
 #stage{border:1px solid var(--line);border-radius:20px;padding:26px;display:flex;justify-content:center;overflow:hidden}
 #av{width:min(260px,70vw);aspect-ratio:1;border:8px solid #ff9f1c;overflow:hidden;background:#ffffff99}
 #av svg,#grid svg{width:100%;height:100%;display:block}
+#av canvas{width:100%;height:100%;object-fit:cover;display:block}
 #av img,#grid img{width:100%;height:100%;object-fit:cover;display:block}
 .circle{border-radius:50%}.round{border-radius:28px}.square{border-radius:0}
 #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:10px;margin-top:14px}
@@ -38,7 +39,7 @@ small{color:var(--mut)}
 <body>
 <main>
 <h1>Mes avatars</h1>
-<p class="sub">Crée des avatars, ajoute tes photos, change d'apparence et anime-les avec ta voix et ta caméra.</p>
+<p class="sub">Crée des avatars, ajoute tes photos, change d'apparence et anime-les avec ta caméra. <small>Version 3</small></p>
 <div id="stage"><div id="av" class="circle"></div></div>
 <p id="msg" aria-live="polite"></p>
 <div class="row">
@@ -49,7 +50,7 @@ small{color:var(--mut)}
 <div class="row gen"><button data-p="hs" data-n="4">Coiffure</button><button data-p="es" data-n="3">Yeux</button><button data-p="ac" data-n="3">Accessoire</button><button id="cols">Couleurs</button></div>
 <div class="row"><button data-s="circle">Rond</button><button data-s="round">Arrondi</button><button data-s="square">Carré</button>
 <small>Cadre</small><input id="col" type="color" aria-label="Couleur du cadre"><small>Fond</small><input id="bgc" type="color" aria-label="Couleur du fond"></div>
-<div class="row"><button id="live">Animer avec ma caméra</button><button id="dl">Télécharger l'image</button><button id="del" class="danger">Supprimer</button></div>
+<div class="row"><button id="live">Animer avec ma caméra</button><button id="mir">Miroir</button><button id="dl">Télécharger l'image</button><button id="del" class="danger">Supprimer</button></div>
 <div id="grid"></div>
 </main>
 <script>
@@ -113,7 +114,8 @@ $('#dl').onclick=async()=>{
     k.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='avatar.png';a.click();msg("Image téléchargée.")});
   }catch(e){msg("Le téléchargement n'est pas possible ici. Ouvre le fichier dans Chrome.")}
 };
-let live=null,FL=null;
+let live=null,FL=null,mir=false;
+const PM={},LIP=new Set([78,191,80,81,82,13,312,311,310,415,308,324,318,402,317,14,87,178,88,95]);
 async function loadFace(){
   if(FL)return FL;
   const V='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
@@ -124,39 +126,89 @@ async function loadFace(){
   return FL;
 }
 const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+function delaunay(P){
+  const n=P.length;let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  for(const [x,y] of P){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y)}
+  const d=Math.max(x1-x0,y1-y0)*20,mx=(x0+x1)/2,my=(y0+y1)/2;
+  const V=P.concat([[mx-d,my-d],[mx,my+d],[mx+d,my-d]]);
+  const cc=t=>{const [a,b,c]=t.map(i=>V[i]);const D=2*(a[0]*(b[1]-c[1])+b[0]*(c[1]-a[1])+c[0]*(a[1]-b[1]));const sa=a[0]*a[0]+a[1]*a[1],sb=b[0]*b[0]+b[1]*b[1],sc=c[0]*c[0]+c[1]*c[1];const ux=(sa*(b[1]-c[1])+sb*(c[1]-a[1])+sc*(a[1]-b[1]))/D,uy=(sa*(c[0]-b[0])+sb*(a[0]-c[0])+sc*(b[0]-a[0]))/D;return [ux,uy,(a[0]-ux)**2+(a[1]-uy)**2]};
+  let T=[[n,n+1,n+2]].map(t=>({t,c:cc(t)}));
+  for(let i=0;i<n;i++){
+    const [x,y]=V[i],keep=[],E={};
+    for(const o of T){const [ux,uy,r]=o.c;if((x-ux)**2+(y-uy)**2<r){for(let k=0;k<3;k++){const a=o.t[k],b=o.t[(k+1)%3],key=a<b?a+','+b:b+','+a;E[key]=(E[key]||0)+1}}else keep.push(o)}
+    for(const o of T){const [ux,uy,r]=o.c;if((x-ux)**2+(y-uy)**2<r)for(let k=0;k<3;k++){const a=o.t[k],b=o.t[(k+1)%3],key=a<b?a+','+b:b+','+a;if(E[key]===1){const t=[a,b,i];keep.push({t,c:cc(t)})}}}
+    T=keep;
+  }
+  return T.map(o=>o.t).filter(t=>t.every(i=>i<n));
+}
+function tri(g,img,s,d,dark){
+  const [x0,y0]=s[0],[x1,y1]=s[1],[x2,y2]=s[2],[u0,v0]=d[0],[u1,v1]=d[1],[u2,v2]=d[2];
+  const D=x0*(y1-y2)+x1*(y2-y0)+x2*(y0-y1);if(Math.abs(D)<1e-6)return;
+  const mx=(u0+u1+u2)/3,my=(v0+v1+v2)/3,ex=([u,v])=>{const l=Math.hypot(u-mx,v-my)||1;return [u+(u-mx)/l*.7,v+(v-my)/l*.7]};
+  const [a,b,c]=[[u0,v0],[u1,v1],[u2,v2]].map(ex);
+  g.save();g.beginPath();g.moveTo(a[0],a[1]);g.lineTo(b[0],b[1]);g.lineTo(c[0],c[1]);g.closePath();
+  if(dark){g.fillStyle='#3a1014';g.fill();g.restore();return}
+  g.clip();
+  g.setTransform((u0*(y1-y2)+u1*(y2-y0)+u2*(y0-y1))/D,(v0*(y1-y2)+v1*(y2-y0)+v2*(y0-y1))/D,(u0*(x2-x1)+u1*(x0-x2)+u2*(x1-x0))/D,(v0*(x2-x1)+v1*(x0-x2)+v2*(x1-x0))/D,(u0*(x1*y2-x2*y1)+u1*(x2*y0-x0*y2)+u2*(x0*y1-x1*y0))/D,(v0*(x1*y2-x2*y1)+v1*(x2*y0-x0*y2)+v2*(x0*y1-x1*y0))/D);
+  const bx=Math.floor(Math.min(x0,x1,x2))-1,by=Math.floor(Math.min(y0,y1,y2))-1,bw=Math.ceil(Math.max(x0,x1,x2))-bx+1,bh=Math.ceil(Math.max(y0,y1,y2))-by+1;
+  g.drawImage(img,bx,by,bw,bh,bx,by,bw,bh);g.restore();
+}
+async function prep(c,fl){
+  const img=new Image();img.src=c.src;await img.decode();
+  await fl.setOptions({runningMode:'IMAGE'});
+  const r=fl.detect(img);
+  await fl.setOptions({runningMode:'VIDEO'});
+  const p=r.faceLandmarks&&r.faceLandmarks[0];
+  if(!p)return {id:c.id,fail:true};
+  const P=p.slice(0,468).map(o=>[o.x*img.width,o.y*img.height]);
+  const cv=document.createElement('canvas');cv.width=img.width;cv.height=img.height;
+  return {id:c.id,img,P,T:delaunay(P),cv,g:cv.getContext('2d'),cx:P.reduce((s,q)=>s+q[0],0)/468,cy:P.reduce((s,q)=>s+q[1],0)/468,ed:Math.hypot(P[263][0]-P[33][0],P[263][1]-P[33][1])};
+}
+function paint(pm,q){
+  const g=pm.g;g.setTransform(1,0,0,1,0,0);g.drawImage(pm.img,0,0);
+  let lx=0,ly=0;for(const t of q){lx+=t[0];ly+=t[1]}lx/=468;ly/=468;
+  const k=pm.ed/Math.hypot(q[263][0]-q[33][0],q[263][1]-q[33][1]);
+  const D=q.map(t=>[pm.cx+(t[0]-lx)*k,pm.cy+(t[1]-ly)*k]);
+  for(const [a,b,c] of pm.T)tri(g,pm.img,[pm.P[a],pm.P[b],pm.P[c]],[D[a],D[b],D[c]],LIP.has(a)&&LIP.has(b)&&LIP.has(c));
+}
+$('#mir').onclick=()=>{mir=!mir;$('#mir').style.background=mir?'var(--ac)':''};
 $('#live').onclick=async()=>{
   if(live){live.stop();return}
   try{
     msg('Chargement du suivi du visage...');
     const [fl,ms]=await Promise.all([loadFace(),navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:'user'}})]);
     const v=document.createElement('video');v.muted=true;v.playsInline=true;v.srcObject=ms;await v.play();
-    const s={x:0,y:0,rx:0,ry:0,rz:0,sc:1,m:0};let base=null,key='',last=-1,on=true,blink=false;const av=$('#av');
+    const s={x:0,y:0,rx:0,ry:0,rz:0,sc:1,m:0};let base=null,key='',last=-1,on=true,blink=false,busy=false;const av=$('#av');
     (function loop(){
       if(!on)return;
-      if(v.currentTime!==last){
+      if(!busy&&v.currentTime!==last){
         last=v.currentTime;
-        const r=fl.detectForVideo(v,performance.now()),p=r.faceLandmarks&&r.faceLandmarks[0];
-        if(p){
+        const c=cur();
+        if(c&&c.kind==='photo'&&!PM[c.id]){
+          busy=true;msg('Analyse de ta photo...');
+          prep(c,fl).catch(()=>({id:c.id,fail:true})).then(x=>{PM[c.id]=x;msg(x.fail?"Je ne vois pas de visage dans cette photo. Choisis une photo de face, visage bien visible.":"Bouge, parle, souris : la photo te suit.")}).finally(()=>{busy=false});
+        }else{
+        const r=fl.detectForVideo(v,performance.now()),p=r.faceLandmarks&&r.faceLandmarks[0],pm=c&&c.kind==='photo'?PM[c.id]:null;
+        if(p&&pm&&!pm.fail){
+          if(!av.contains(pm.cv)){av.innerHTML='';av.appendChild(pm.cv)}
+          av.style.transform='';pm.cv.style.transform=mir?'scaleX(-1)':'';
+          paint(pm,p.slice(0,468).map(o=>[o.x*v.videoWidth,o.y*v.videoHeight]));
+        }else if(p){
           const L=p[33],R=p[263],N=p[1],U=p[13],D=p[14],T=p[10],C=p[152];
           const ex=(L.x+R.x)/2,ey=(L.y+R.y)/2,ed=Math.hypot(R.x-L.x,R.y-L.y);
           const pr=(N.y-ey)/ed;if(!base)base={pr,ed};
-          const k=.4,t={
-            x:-(N.x-.5)*2*70,y:(N.y-.5)*2*40,
-            ry:cl((N.x-ex)/ed*110,-40,40),rx:cl(-(pr-base.pr)*110,-30,30),
-            rz:-Math.atan2(R.y-L.y,R.x-L.x)*180/Math.PI,
-            sc:cl(ed/base.ed,.8,1.3),m:cl(((D.y-U.y)/(C.y-T.y)-.015)/.08,0,1)
-          };
-          for(const q in t)s[q]+=(t[q]-s[q])*k;
+          const t={x:-(N.x-.5)*2*70,y:(N.y-.5)*2*40,ry:cl((N.x-ex)/ed*110,-40,40),rx:cl(-(pr-base.pr)*110,-30,30),rz:-Math.atan2(R.y-L.y,R.x-L.x)*180/Math.PI,sc:cl(ed/base.ed,.8,1.3),m:cl(((D.y-U.y)/(C.y-T.y)-.015)/.08,0,1)};
+          for(const q in t)s[q]+=(t[q]-s[q])*.4;
           blink=Math.abs(p[159].y-p[145].y)/Math.abs(p[33].x-p[133].x)<.12;
           av.style.transform=`translate(${s.x}px,${s.y}px) perspective(500px) rotateX(${s.rx}deg) rotateY(${s.ry}deg) rotateZ(${s.rz}deg) scale(${s.sc})`;
-          const c=cur(),nk=Math.round(s.m*10)+':'+blink;
+          const nk=Math.round(s.m*10)+':'+blink;
           if(c&&c.kind==='gen'&&nk!==key){key=nk;av.innerHTML=svg(c.a,s.m,blink)}
-        }
+        }}
       }
       requestAnimationFrame(loop);
     })();
     live={stop(){on=false;ms.getTracks().forEach(t=>t.stop());av.style.transform='';live=null;$('#live').textContent='Animer avec ma caméra';msg();refresh()}};
-    $('#live').textContent="Arrêter l'animation";msg("Regarde la caméra : ton avatar suit ta tête. Les avatars dessinés ouvrent aussi la bouche et clignent des yeux.");
+    $('#live').textContent="Arrêter l'animation";msg("Regarde la caméra et bouge.");
   }catch(e){msg("Le suivi du visage n'a pas démarré ("+(e&&e.name||'erreur')+"). Vérifie ta connexion et autorise la caméra.")}
 };
 open().then(async()=>{items=await all();if(!items.length){for(let i=0;i<4;i++)await save(gen())}refresh()});
